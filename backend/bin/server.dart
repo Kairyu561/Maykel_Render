@@ -20,7 +20,9 @@ import '../lib/db.dart';
 final db = DatabaseService();
 
 final String _dirBackend = p.dirname(p.dirname(Platform.script.toFilePath()));
-late final String rutaBuildWeb =
+// Carpeta con la app Flutter compilada (flutter build web). En el
+// contenedor Docker se indica con WEB_DIR; en local se usa ../app/build/web.
+late final String rutaBuildWeb = Platform.environment['WEB_DIR'] ??
     p.join(p.dirname(_dirBackend), 'app', 'build', 'web');
 
 const List<String> permisosDisponibles = [
@@ -174,8 +176,11 @@ Future<Map<String, dynamic>?> _autenticar(Request request) async {
     final usuarioInput = credenciales.substring(0, separador).trim();
     final passwordInput = credenciales.substring(separador + 1).trim();
 
-    // 1. Acceso inmediato para SuperAdmin maestro (evita bloqueos si la tabla roles aún no se migra)
-    final envAdmins = db.env['ADMIN_USERS'] ?? 'admin:maykel2026,francisca:maykel2026,daniel:maykel2026';
+    // 1. Acceso inmediato para SuperAdmin maestro (evita bloqueos si la tabla roles aún no se migra).
+    // Solo si ADMIN_USERS está definida: sin valor por defecto en el código,
+    // para que un sitio publicado no acepte claves conocidas por cualquiera
+    // que lea el repositorio.
+    final envAdmins = db.env['ADMIN_USERS'] ?? '';
     for (final par in envAdmins.split(',')) {
       final partes = par.split(':');
       if (partes.length >= 2 &&
@@ -252,7 +257,7 @@ Middleware _authSoloAdmin() {
         return Response(
           401,
           body: jsonEncode({
-            'error': 'Credenciales inválidas. Usa admin / maykel2026'
+            'error': 'Credenciales inválidas.'
           }),
           headers: {
             'content-type': 'application/json; charset=utf-8',
@@ -989,10 +994,11 @@ void main(List<String> args) async {
   router.post('/api/v1/sync/inventory', (Request req) async {
     final tokenHeader =
         req.headers['authorization']?.replaceFirst('Bearer ', '');
-    final expectedToken =
-        db.env['SYNC_API_TOKEN'] ?? 'maykel2_sync_token_secreto_2026';
+    // Sin SYNC_API_TOKEN configurado se rechaza toda sincronización (no hay
+    // token por defecto en el código).
+    final expectedToken = db.env['SYNC_API_TOKEN'] ?? '';
 
-    if (tokenHeader != expectedToken) {
+    if (expectedToken.isEmpty || tokenHeader != expectedToken) {
       await db.conn.execute(
         '''
           INSERT INTO logs_sincronizacion (estado, mensaje_detalle)
@@ -1180,6 +1186,12 @@ void main(List<String> args) async {
 
   final port = int.tryParse(db.env['PORT'] ?? '8080') ?? 8080;
   final server = await io.serve(pipeline, InternetAddress.anyIPv4, port);
+  // Escucha en 0.0.0.0 (todas las interfaces), pero esa dirección no se
+  // abre en el navegador: en local se entra por localhost.
   print(
-      '🚀 Servidor Backend Unificado Maykel Repuestos 2 (PostgreSQL) corriendo en http://${server.address.host}:${server.port}');
+      '🚀 Servidor Backend Unificado Maykel Repuestos 2 (PostgreSQL) corriendo en http://localhost:${server.port}');
+  if ((db.env['ADMIN_USERS'] ?? '').isEmpty) {
+    print('ℹ️ ADMIN_USERS no está definida: el panel solo acepta los usuarios '
+        'de la tabla "usuarios".');
+  }
 }
