@@ -1,0 +1,7 @@
+# Archivos que no se copian a la imagen Docker.
+.git
+**/.dart_tool
+**/build
+**/.env
+app/.flutter-plugins
+app/.flutter-plugins-dependencies

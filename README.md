@@ -65,3 +65,7 @@ dart run bin/server.dart
 
 Abre `http://localhost:8080` en tu navegador.
 
+## Despliegue de prueba
+
+Para publicar el sitio gratis en Render (con la base de datos en Neon), ver
+[`DESPLIEGUE_RENDER.md`](DESPLIEGUE_RENDER.md).
